@@ -1,13 +1,10 @@
 package com.xxm.main;
 
 import com.pygmalios.reactiveinflux.jawa.JavaPoint;
-import com.pygmalios.reactiveinflux.spark.InfluxUtils;
 import com.pygmalios.reactiveinflux.spark.jawa.SparkInflux;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.Function2;
-import org.apache.spark.api.java.function.VoidFunction;
-import org.apache.spark.rdd.RDD;
 import org.apache.spark.sql.*;
 import org.apache.spark.streaming.Durations;
 import org.apache.spark.streaming.api.java.JavaDStream;
@@ -18,10 +15,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TradingRecordProcessor implements Serializable{
@@ -48,9 +44,21 @@ public class TradingRecordProcessor implements Serializable{
                 .window(Durations.seconds(WINDOW_TIME),Durations.seconds(SLIDING_INTERVAL))
                 .reduce((Function2<TradingRecord, TradingRecord, TradingRecord>) (current, previous) -> {
                     double highReturn = (current.getHigh() - previous.getHigh()) /previous.getHigh();
+                    if (highReturn <-1){
+                        highReturn+=1;
+                    }
                     double lowReturn = (current.getLow() - previous.getLow()) /previous.getLow();
+                    if (lowReturn <-1){
+                        lowReturn+=1;
+                    }
                     double openReturn = (current.getOpen() - previous.getOpen()) /previous.getOpen();
+                    if (lowReturn <-1){
+                        lowReturn+=1;
+                    }
                     double closeReturn = (current.getClose() - previous.getClose()) /previous.getClose();
+                    if (lowReturn <-1){
+                        lowReturn+=1;
+                    }
                     TradingRecord res = new TradingRecord(previous.getSymbol(),highReturn,lowReturn,openReturn,closeReturn,current.getVolume());
                     res.setTimestamp(current.getTimestampAsString());
                     return res;});

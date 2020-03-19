@@ -10,6 +10,7 @@ import org.joda.time.DateTime;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 public class GCSRecordInflux implements Serializable {
@@ -45,22 +46,24 @@ public class GCSRecordInflux implements Serializable {
         }
     }
     private void setValue(String key,double num){
+        Random random = new Random();
+        random.setSeed(5);
         if (key.equals("kurtosisOpen")){
-            setKurtosisOpen(num);
+            setKurtosisOpen(num*random.nextDouble());
         }else if (key.equals("kurtosisClose")){
-            setKurtosisClose(num);
+            setKurtosisClose(num*random.nextDouble());
         }else if (key.equals("meanOpen")){
-            setAverageOpen(num);
+            setAverageOpen(num*random.nextDouble());
         }else if (key.equals("meanClose")){
-            setAverageClose(num);
+            setAverageClose(num*random.nextDouble());
         }else if (key.equals("stdOpen")){
-            setStdOpen(num);
+            setStdOpen(num*random.nextDouble());
         }else if (key.equals("stdClose")){
             setStdClose(num);
         }else if (key.equals("skewnessOpen")){
-            setSkewnessOpen(num);
+            setSkewnessOpen(num*random.nextDouble());
         }else{
-            setSkewnessClose(num);
+            setSkewnessClose(num*random.nextDouble());
         }
     }
     public double getKurtosisOpen() {
