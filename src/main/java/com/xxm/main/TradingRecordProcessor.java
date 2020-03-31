@@ -4,12 +4,9 @@ import com.pygmalios.reactiveinflux.jawa.JavaPoint;
 import com.pygmalios.reactiveinflux.spark.jawa.SparkInflux;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.Function;
-import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.sql.*;
 import org.apache.spark.streaming.Durations;
 import org.apache.spark.streaming.api.java.JavaDStream;
-import org.influxdb.InfluxDB;
-import org.influxdb.InfluxDBFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,130 +36,51 @@ public class TradingRecordProcessor implements Serializable{
     public void process(){
         SparkInflux sparkInflux = new SparkInflux("final_year_project",3000);
         TradingRecord tradingRecord = new TradingRecord();
-        //JavaDStream<TradingRecord> originalStream = messageStream.map(tradingRecord::parseData);
-        JavaDStream<TradingRecord> returnStream  = messageStream.map(tradingRecord::parseData)
-                .window(Durations.seconds(WINDOW_TIME),Durations.seconds(SLIDING_INTERVAL))
-                .reduce((Function2<TradingRecord, TradingRecord, TradingRecord>) (current, previous) -> {
-                    double highReturn = (current.getHigh() - previous.getHigh()) /previous.getHigh();
-                    if (highReturn <-1){
-                        highReturn+=1;
-                    }
-                    double lowReturn = (current.getLow() - previous.getLow()) /previous.getLow();
-                    if (lowReturn <-1){
-                        lowReturn+=1;
-                    }
-                    double openReturn = (current.getOpen() - previous.getOpen()) /previous.getOpen();
-                    if (lowReturn <-1){
-                        lowReturn+=1;
-                    }
-                    double closeReturn = (current.getClose() - previous.getClose()) /previous.getClose();
-                    if (lowReturn <-1){
-                        lowReturn+=1;
-                    }
-                    TradingRecord res = new TradingRecord(previous.getSymbol(),highReturn,lowReturn,openReturn,closeReturn,current.getVolume());
-                    res.setTimestamp(current.getTimestampAsString());
-                    return res;});
-
-        JavaDStream<JavaPoint> InfluxReturnStream = returnStream.map(message ->tradingRecord.getInfluxPoint(message,"return"));
-
-        sparkInflux.saveToInflux(InfluxReturnStream);
-
-        processReturn(returnStream,sparkInflux);
+        JavaDStream<TradingRecord> originalStream = messageStream.map(tradingRecord::parseData);
+        processReturn(originalStream,sparkInflux);
     }
 
     private void processReturn(JavaDStream<TradingRecord> stream, SparkInflux sparkInflux) {
-        InfluxDB client = InfluxDBFactory.connect("http://35.202.114.76:8086");
-
         Encoder<GCSRecordInflux> gcsRecordEncoderInflux = Encoders.bean(GCSRecordInflux.class);
         Encoder<GCSRecord> gcsRecordEncoder = Encoders.bean(GCSRecord.class);
-        String[] functions = {"mean","std","kurtosis","skewness"};
         AtomicBoolean flag = new AtomicBoolean(false);
         JavaDStream<GCSRecord> gcsRecordJavaDStream = stream.map(
                 tradingRecord -> {
                     GCSRecord gcsRecord = new GCSRecord();
                     gcsRecord.setOpenReturn(tradingRecord.getOpen());
                     gcsRecord.setCloseReturn(tradingRecord.getClose());
-                    flag.set(true);
+                    gcsRecord.setId(tradingRecord.getId());
                     return gcsRecord;
                 }
         );
         List<GCSRecordInflux> list = new ArrayList<>();
-        JavaDStream<JavaPoint> javaPointJavaDStream = gcsRecordJavaDStream.window(Durations.minutes(1))
-                .transform(new Function<JavaRDD<GCSRecord>, JavaRDD<GCSRecordInflux>>() {
-            @Override
-            public JavaRDD<GCSRecordInflux> call(JavaRDD<GCSRecord> gcsRecordJavaRDD) throws InterruptedException {
-                JavaRDD<GCSRecord> rdd = gcsRecordJavaRDD;
+        JavaDStream<JavaPoint> javaPointJavaDStream = gcsRecordJavaDStream.window(Durations.seconds(WINDOW_TIME))
+                .transform((Function<JavaRDD<GCSRecord>, JavaRDD<GCSRecordInflux>>) gcsRecordJavaRDD -> {
+                    if (!gcsRecordJavaRDD.isEmpty()) {
+                        Dataset<GCSRecord> tempDataSet = context.createDataset(gcsRecordJavaRDD.rdd(), gcsRecordEncoder);
+                        dataset = dataset.union(tempDataSet);
 
-                if (!gcsRecordJavaRDD.isEmpty()){
-                    Dataset<GCSRecord> tempDataSet = context.createDataset(gcsRecordJavaRDD.rdd(),gcsRecordEncoder);
-                    dataset.union(tempDataSet);
-
-                    Map<String,Double> map = new ConcurrentHashMap<>();
-                    for(String function:functions){
-                        MyTask task = new MyTask(function,map);
-                        task.start();
-                        task.join();
+                        Map<String, Double> map = new ConcurrentHashMap<>();
+                        double avgOpenReturn = dataset.agg(functions.avg("openReturn")).toJavaRDD().first().getDouble(0);
+                        double avgCloseReturn = dataset.agg(functions.avg("closeReturn")).toJavaRDD().first().getDouble(0);
+                        double stdOpenReturn = dataset.agg(functions.stddev("openReturn")).toJavaRDD().first().getDouble(0);
+                        double stdCloseReturn = dataset.agg(functions.stddev("CloseReturn")).toJavaRDD().first().getDouble(0);
+                        map.put("avgOpenReturn", avgOpenReturn);
+                        map.put("avgCloseReturn", avgCloseReturn);
+                        map.put("stdCloseReturn", stdCloseReturn);
+                        map.put("stdOpenReturn", stdOpenReturn);
+                        map.put("volatilityOpen",avgOpenReturn/stdOpenReturn);
+                        map.put("volatilityClose",avgCloseReturn/stdCloseReturn);
+                        GCSRecordInflux gcsRecordInflux = new GCSRecordInflux(map);
+                        list.add(gcsRecordInflux);
                     }
-                    GCSRecordInflux gcsRecordInflux = new GCSRecordInflux(map);
-                    list.add(gcsRecordInflux);
-                }
-                ArrayList<GCSRecordInflux> copy = new ArrayList<>(list);
-                list.clear();
-                return context.createDataFrame(copy,GCSRecordInflux.class).as(gcsRecordEncoderInflux).toJavaRDD();
-            }
-        }).map(gcsRecordInlux -> gcsRecordInlux.getJavaPoint("return","JPM_HISTORICAL"));
+                    ArrayList<GCSRecordInflux> copy = new ArrayList<>(list);
+                    list.clear();
+                    return context.createDataFrame(copy, GCSRecordInflux.class).as(gcsRecordEncoderInflux).toJavaRDD();
+                }).map(gcsRecordInlux -> gcsRecordInlux.getJavaPoint("return", "JPM_HISTORICAL"));
         javaPointJavaDStream.print();
         sparkInflux.saveToInflux(javaPointJavaDStream);
 
     }
-
-
-
-
-class MyTask extends Thread{
-        private String function;
-        private Map<String,Double> res;
-        public MyTask(String function,Map<String,Double> res){
-            this.function = function;
-            this.res = res;
-        }
-        public void run(){
-            switch (function) {
-                case "mean": {
-                    Dataset<Row> temp = dataset.agg(functions.avg("openReturn"));
-                    temp.show();
-                    JavaRDD<Row> javaDoubleRDDOpen = temp.toJavaRDD();
-                    res.put(function + "Open", javaDoubleRDDOpen.first().getDouble(0));
-                    JavaRDD<Row> javaDoubleRDDClose = dataset.agg(functions.avg("closeReturn")).toJavaRDD();
-                    res.put(function + "Close", javaDoubleRDDClose.first().getDouble(0));
-                }
-                case "std": {
-                    Dataset<Row> temp = dataset.agg(functions.stddev("openReturn"));
-                    //temp.show();
-                    JavaRDD<Row> javaDoubleRDDOpen = temp.toJavaRDD();
-                    res.put(function + "Open", javaDoubleRDDOpen.first().getDouble(0));
-                    JavaRDD<Row> javaDoubleRDDClose = dataset.agg(functions.stddev("closeReturn")).toJavaRDD();
-                    res.put(function + "Close", javaDoubleRDDClose.first().getDouble(0));
-                }
-                case "kurtosis": {
-                    Dataset<Row> temp = dataset.agg(functions.kurtosis("openReturn"));
-                    //temp.show();
-                    JavaRDD<Row> javaDoubleRDDOpen = temp.toJavaRDD();
-                    res.put(function + "Open", javaDoubleRDDOpen.first().getDouble(0));
-                    JavaRDD<Row> javaDoubleRDDClose = dataset.agg(functions.kurtosis("closeReturn")).toJavaRDD();
-                    res.put(function + "Close", javaDoubleRDDClose.first().getDouble(0));
-                }
-                default: {
-                    Dataset<Row> temp = dataset.agg(functions.skewness("openReturn"));
-                    // temp.show();
-                    JavaRDD<Row> javaDoubleRDDOpen = temp.toJavaRDD();
-                    res.put(function + "Open", javaDoubleRDDOpen.first().getDouble(0));
-                    JavaRDD<Row> javaDoubleRDDClose = dataset.agg(functions.skewness("closeReturn")).toJavaRDD();
-                    res.put(function + "Close", javaDoubleRDDClose.first().getDouble(0));
-                }
-            }
-        }
-}
-
 
 }

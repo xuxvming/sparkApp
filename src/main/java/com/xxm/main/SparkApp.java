@@ -25,18 +25,18 @@ public class SparkApp implements Serializable {
         String topic = "sparkapp";
         String checkpointDir = "/Users/xiuxuming/Desktop/FYP/sparkCheckPoint";
         String slidingInterval = "10000";
-        JavaStreamingContext context = JavaStreamingContext.getOrCreate(checkpointDir,()->createContext(projectID,topic,slidingInterval));
+        JavaStreamingContext context = JavaStreamingContext.getOrCreate(checkpointDir,()->createContext(projectID,topic,slidingInterval,checkpointDir));
         context.start();
         context.awaitTermination();
     }
 
-    private static JavaStreamingContext createContext(String projectID, String topic, String slidingInterval){
+    private static JavaStreamingContext createContext(String projectID, String topic, String slidingInterval,String checkPointDir){
         SparkConf defaultSparkConf = new SparkConf().setAppName("SparkApp").setMaster("local[*]");
 
         SparkGCPCredentials credentials = new SparkGCPCredentials.Builder().jsonServiceAccount("/Users/xiuxuming/Desktop/FYP/SparkApp/src/main/resources/service-account.json").build();
         JavaStreamingContext streamingContext = new JavaStreamingContext(
                 defaultSparkConf,Duration.apply(Long.parseLong(slidingInterval)));
-
+        streamingContext.checkpoint(checkPointDir);
         Configuration hadoopConf = streamingContext.sparkContext().hadoopConfiguration();
         hadoopConf.set(
                 EntriesCredentialConfiguration.BASE_KEY_PREFIX +

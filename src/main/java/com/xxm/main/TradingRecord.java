@@ -24,7 +24,7 @@ public class TradingRecord implements Serializable {
     private double close;
     private double open;
     private double volume;
-    private String timestamp;
+    private String id;
 
     private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -61,7 +61,6 @@ public class TradingRecord implements Serializable {
         double openReturn = (current.getOpen() - previous.getOpen()) /previous.getOpen();
         double closeReturn = (current.getClose() - previous.getClose()) /previous.getClose();
         TradingRecord res = new TradingRecord(previous.getSymbol(),highReturn,lowReturn,openReturn,closeReturn,current.getVolume());
-        res.setTimestamp(current.getTimestamp().toString());
         return res;
     }
 
@@ -83,17 +82,6 @@ public class TradingRecord implements Serializable {
 
     public double getOpen() {
         return open;
-    }
-
-    public DateTime getTimestamp() {
-        DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss");
-        return dateTimeFormatter.parseDateTime(timestamp);
-    }
-    public String getTimestampAsString(){
-        return timestamp;
-    }
-    public void setTimestamp(String timestamp) {
-        this.timestamp = timestamp;
     }
 
     public double getVolume() {
@@ -121,5 +109,13 @@ public class TradingRecord implements Serializable {
                 tags,
                 fields
         );
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 }

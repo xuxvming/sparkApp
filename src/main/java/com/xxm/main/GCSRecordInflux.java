@@ -1,17 +1,14 @@
 package com.xxm.main;
 
 
-import com.google.api.services.storage.model.ObjectAccessControl;
 import com.pygmalios.reactiveinflux.jawa.JavaPoint;
 import org.apache.commons.collections.map.HashedMap;
-import org.influxdb.dto.Point;
 import org.joda.time.DateTime;
 
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 public class GCSRecordInflux implements Serializable {
     private double kurtosisOpen;

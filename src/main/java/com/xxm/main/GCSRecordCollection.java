@@ -1,12 +1,8 @@
 package com.xxm.main;
 
-import com.pygmalios.reactiveinflux.jawa.JavaPoint;
-import org.apache.spark.sql.*;
+import org.apache.spark.sql.Dataset;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
 
 public class GCSRecordCollection implements Serializable {
 

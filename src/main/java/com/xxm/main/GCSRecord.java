@@ -7,6 +7,7 @@ import java.util.List;
 public class GCSRecord implements Serializable {
     private double openReturn;
     private double closeReturn;
+    private String id;
     public GCSRecord(){
 
     }
@@ -32,4 +33,11 @@ public class GCSRecord implements Serializable {
         this.closeReturn = closeReturn;
     }
 
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
 }
