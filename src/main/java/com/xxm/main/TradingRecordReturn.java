@@ -1,11 +1,5 @@
 package com.xxm.main;
 
-import com.pygmalios.reactiveinflux.jawa.JavaPoint;
-import org.joda.time.DateTime;
-
-import java.util.HashMap;
-import java.util.Map;
-
 public class TradingRecordReturn {
 
     private String symbol;

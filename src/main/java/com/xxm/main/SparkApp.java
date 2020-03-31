@@ -1,7 +1,6 @@
 package com.xxm.main;
 
 import com.google.cloud.hadoop.util.EntriesCredentialConfiguration;
-import com.google.inject.internal.cglib.core.$AbstractClassGenerator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.function.MapFunction;
@@ -14,9 +13,7 @@ import org.apache.spark.streaming.pubsub.PubsubUtils;
 import org.apache.spark.streaming.pubsub.SparkGCPCredentials;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 public class SparkApp implements Serializable {
 

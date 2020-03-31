@@ -2,7 +2,6 @@ package com.xxm.main;
 
 
 import java.io.Serializable;
-import java.util.List;
 
 public class GCSRecord implements Serializable {
     private double openReturn;
