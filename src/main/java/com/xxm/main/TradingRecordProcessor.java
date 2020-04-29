@@ -4,6 +4,7 @@ import com.pygmalios.reactiveinflux.jawa.JavaPoint;
 import com.pygmalios.reactiveinflux.spark.jawa.SparkInflux;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.sql.*;
 import org.apache.spark.streaming.Durations;
 import org.apache.spark.streaming.api.java.JavaDStream;
@@ -36,8 +37,21 @@ public class TradingRecordProcessor implements Serializable{
     public void process(){
         SparkInflux sparkInflux = new SparkInflux("final_year_project",3000);
         TradingRecord tradingRecord = new TradingRecord();
-        JavaDStream<TradingRecord> originalStream = messageStream.map(tradingRecord::parseData);
-        processReturn(originalStream,sparkInflux);
+        JavaDStream<TradingRecord> returnStream  = messageStream.map(tradingRecord::parseData)
+                .window(Durations.seconds(WINDOW_TIME),Durations.seconds(SLIDING_INTERVAL))
+                .reduce((Function2<TradingRecord, TradingRecord, TradingRecord>) (current, previous) -> {
+                    double highReturn = (current.getHigh() - previous.getHigh()) /previous.getHigh();
+                    double lowReturn = (current.getLow() - previous.getLow()) /previous.getLow();
+                    double openReturn = (current.getOpen() - previous.getOpen()) /previous.getOpen();
+                    double closeReturn = (current.getClose() - previous.getClose()) /previous.getClose();
+                    TradingRecord res = new TradingRecord(previous.getSymbol(),highReturn,lowReturn,openReturn,closeReturn,current.getVolume());
+                    return res;});
+
+        JavaDStream<JavaPoint> InfluxReturnStream = returnStream.map(message ->tradingRecord.getInfluxPoint(message,"return"));
+
+        sparkInflux.saveToInflux(InfluxReturnStream);
+
+        processReturn(returnStream,sparkInflux);
     }
 
     private void processReturn(JavaDStream<TradingRecord> stream, SparkInflux sparkInflux) {
