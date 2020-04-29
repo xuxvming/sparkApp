@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TradingRecordProcessor implements Serializable{
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TradingRecordProcessor.class);
-    private static final long WINDOW_TIME = 20;
+    private static final long WINDOW_TIME = 15;
     private static final long SLIDING_INTERVAL =10;
 
     private JavaDStream<String> messageStream;
