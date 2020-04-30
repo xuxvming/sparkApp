@@ -46,7 +46,7 @@ public class SparkApp implements Serializable {
         SparkSession sparkSession = sparkContext.sparkSession();
 
         //String inputFile = "gs://dataproc-670dfbbb-c08b-407a-9ed4-64166c00a3e2-us-central1/processed/JPM_processed_gen/part-00000-8ad8ec40-6aa0-4d50-81c1-1139094a5d45-c000.csv";
-        String inputFile = "gs://dataproc-670dfbbb-c08b-407a-9ed4-64166c00a3e2-us-central1/processed/JPM_processed_gen_return/part-00000-93802c85-37f1-4e88-ad01-b7b6aaee9489-c000.csv";
+        String inputFile = "gs://dataproc-670dfbbb-c08b-407a-9ed4-64166c00a3e2-us-central1/processed/JPM_processed_gen_return/";
 
         Dataset<Row> df = sparkSession.read().format("csv")
                 .option("header","true")
